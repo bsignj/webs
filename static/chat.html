@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link href="https://fonts.googleapis.com/css?family=Titillium+Web" rel="stylesheet">
+    <!-- DaisyUI und Tailwind -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body>
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar Toggle Button -->
+    <button id="toggle-chat" class="bg-gray-800 text-white p-2">Chat</button>
+
+    <!-- Chat Sidebar -->
+    <div id="chat-sidebar" class="bg-gray-900 text-white w-0 overflow-hidden transition-width duration-300 flex flex-col" style="width: 40%">
+        <div class="p-4 flex-grow overflow-y-auto overflow-x-hidden">
+            <h2 class="text-lg mb-4">Chat</h2>
+            <div id="chat" class="chat-messages space-y-4">
+                <!-- Messages -->
+            </div>
+        </div>
+        <div class="p-4">
+            <input type="text" id="newMessage" placeholder="Type Message..." class="w-full p-2 bg-gray-800 rounded">
+            <button id="sendMessage" class="mt-2 w-full bg-blue-500 text-white p-2 rounded">Send Message</button>
+        </div>
+    </div>
+    <script>
+        const toggleButton = document.getElementById('toggle-chat');
+        const chatSidebar = document.getElementById('chat-sidebar');
+
+        toggleButton.addEventListener('click', () => {
+            if (chatSidebar.style.width === '0px' || chatSidebar.style.width === '') {
+                chatSidebar.style.width = '40%';
+            } else {
+                chatSidebar.style.width = '0px';
+            }
+        });
+    </script>
+</div>
+
+<!-- JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script>
+    // Class Message
+    class Message {
+        constructor(from, message, sent = new Date()) {
+            this.from = from;
+            this.message = message;
+            this.sent = sent instanceof Date ? sent : new Date(sent);
+        }
+
+        // Methode zur Formatierung der Nachricht
+        formatTime() {
+            return this.sent.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit'});
+        }
+    }
+
+    // Class Websocket Client
+    class WsClient {
+        constructor(url) {
+            this.url = url;
+            this.ws = new WebSocket(url);
+            this.eventListener = {};
+
+            // Promise for the WebSocket Connection
+            this.isReady = new Promise((resolve, reject) => {
+                this.ws.onopen = () => {
+                    console.log(`Connected to WebSocket at ${url}`);
+                    resolve();
+                };
+
+                this.ws.onclose = () => {
+                    console.log('WebSocket connection closed');
+                };
+
+                this.ws.onerror = (error) => {
+                    console.error(`WebSocket error: ${error}`);
+                    reject(error);
+                };
+            });
+
+            this.ws.onmessage = (response) => {
+                try {
+                    const data = JSON.parse(response.data);
+                    if (Array.isArray(data) && data.length >= 2) {
+                        const type = data[0];
+                        const payload = data[1];
+                        const callback = this.eventListener[type];
+                        if (callback) {
+                            callback(payload);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
+        }
+
+        // Method to register Events
+        on(event, callback) {
+            this.eventListener[event] = callback;
+        }
+
+        // Method to send Events
+        emit(type, payload = {}) {
+            // Wait till the Websocket Connection is ready
+            this.isReady.then(() => {
+                const event = [type, payload];
+                const rawData = JSON.stringify(event);
+                this.ws.send(rawData);
+            }).catch((error) => {
+                console.error('Cannot send message, WebSocket connection failed:', error);
+            });
+        }
+    }
+
+    // WebSocket Client
+    const ws = new WsClient('ws://' + window.location.host + '/ws');
+
+    // Subscribe to the Chat-Room
+    ws.emit('subscribe:chat');
+
+    const newMessageText = document.querySelector('#newMessage');
+    const sendMessageButton = document.querySelector('#sendMessage');
+
+    // Send Chat Message On Button Click
+    sendMessageButton.onclick = () => {
+        const messageData = new Message("basti", newMessageText.value);
+        ws.emit('chat:message', messageData);
+    };
+
+    // Event-Listener for "chat:message"
+    ws.on('chat:message', (data) => {
+        var chat = document.getElementById('chat');
+        var receivedMessage = new Message(data.from, data.message, data.sent);
+
+        // New Div Element
+        var newMessage = document.createElement('div');
+        newMessage.innerHTML = `
+                <div class="chat chat-start">
+                    <div class="chat-image avatar">
+                        <div class="w-8 h-8 rounded-full">
+                        <img
+                            alt="Tailwind CSS chat bubble component"
+                            src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp" />
+                        </div>
+                    </div>
+                    <div class="chat-header text-sm">
+                        ${receivedMessage.from}
+                        <time class="text-xs opacity-50">${receivedMessage.formatTime()}</time>
+                    </div>
+                    <div class="chat-bubble break-all whitespace-normal max-w-full">${receivedMessage.message}</div>
+                </div>
+            `;
+
+        // Add Div Element to Chat
+        chat.appendChild(newMessage);
+    });
+
+</script>
+</body>
+</html>

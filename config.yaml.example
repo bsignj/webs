@@ -1,0 +1,27 @@
+app:
+  name: "ws-chat-app"
+  port: "8383"
+
+hub:
+  buffered_register_size: 1000
+  buffered_unregister_size: 1000
+  buffered_message_size: 1000
+  buffered_room_size: 100
+  buffered_event_size: 100000
+  buffered_client_size: 5000
+
+room:
+  buffered_register_size: 1000
+  buffered_unregister_size: 1000
+  buffered_message_size: 100000
+  buffered_client_size: 5000
+  buffered_workers_size: 100
+
+client:
+  buffered_message_size: 1000
+  buffered_room_size: 100
+
+logger:
+  log_level: "INFO"
+  log_output_path: "file"
+  log_err_output_path: "stderr"
